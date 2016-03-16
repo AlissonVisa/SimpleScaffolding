@@ -20,16 +20,16 @@ individual needs much faster than I ever could with Maven archetypes.
 ### Your templates won't work for me
 
 There is no mandated scaffold template - you can use anything you like. It just has to have placeholders defined using
-the Handlebars notation with no spaces (e.g. `uk.co.froot.example`) listed below:
+the Handlebars notation with no spaces (e.g. `{{package}}`) listed below:
 
 * `package`: Base package, e.g. `org.example`
-* `entity-class`: Entity class, e.g. `Customer`
-* `entity-variable`: Entity variable, e.g. `customer`
-* `entity-title`: Entity in title case, e.g. `Customer`
-* `entity-snake`: Entity in snake case, e.g. `customer`
-* `entity-snake-upper`: Entity variable as uppercase snake case, e.g. `CUSTOMER`</li>
-* `entity-comment`: Entity variable as a comment, e.g. `customer`</li>
-* `entity-hyphen`: Entity variable in hyphenated form, e.g. `customer`</li>
+* `entity-class`: Entity class, e.g. `AdminUser`
+* `entity-variable`: Entity variable, e.g. `adminUser`
+* `entity-title`: Entity in title case, e.g. `Admin User`
+* `entity-snake`: Entity in snake case, e.g. `admin_user`
+* `entity-snake-upper`: Entity variable as uppercase snake case, e.g. `ADMIN_USER`</li>
+* `entity-comment`: Entity variable as a comment, e.g. `admin user`</li>
+* `entity-hyphen`: Entity variable in hyphenated form, e.g. `admin-user`</li>
 
 ### How to install
 
@@ -51,18 +51,18 @@ To get `Scaffolding` to read your existing code you need to provide a `scaffoldi
   "base_package":"uk.co.froot.example",
   "read": true,
   "only_with_entity_directives": true,
-  "entities": ["Customer"],
+  "entities": ["AdminUser"],
   "user_token_map": {"PORT": "1000"}
 }
 ```
 
 All code from `base_package` and below will be recursively examined and templates built. These will be stored under
-`src/test/resources/scaffolding/default`. If a class including the name of one of the entities (`Customer`) is discovered
-like `MongoCustomerReadService.java` for example, then it will be treated as an entity template.
+`src/test/resources/scaffolding/default`. If a class including the name of one of the entities (`AdminUser`) is discovered
+like `MongoAdminUserReadService.java` for example, then it will be treated as an entity template.
 
 Any class that does not include the name of one of the entities will be just a standard file that gets included everywhere
 (like `DateUtils` if you can't have a common support JAR for some reason). You can filter these files using the
-`only_with_entity_directives=true` configuration. If set then only files associated with `Customer` will be made into
+`only_with_entity_directives=true` configuration. If set then only files associated with `AdminUser` will be made into
 templates.
 
 You then delete any that are not useful and edit those that remain to meet your requirements. The idea is to edit them
@@ -78,13 +78,13 @@ http://localhost:{{PORT}}1/example-admin-endpoint
 
 #### TIP: Use entities with "multi-word" names to get snake case
 
-The template reader can infer snake case locations so providing a "multi-word" entity name, like `Customer`
-instead of `User` will enable the correct placement of the directive in the template (e.g. `customer`). This is handy
+The template reader can infer snake case locations so providing a "multi-word" entity name, like `AdminUser`
+instead of `User` will enable the correct placement of the directive in the template (e.g. `admin_user`). This is handy
 for JSON test fixtures and package names.
 
 ### Try it now...
 
-This project contains an example of a DTO (`Customer`). Run `Scaffolding.main()` with `scaffolding.json` set as
+This project contains an example of a DTO (`AdminUser`). Run `Scaffolding.main()` with `scaffolding.json` set as
 above. In the blink of an eye you'll have a few templates under `src/test/resources/scaffolding/default`. Take a look at what
  has been extracted - in particular examine the comments where the `user_token_map` has been at work.
 
@@ -105,16 +105,16 @@ files. You switch away from `read` and provide a list of new entities that you w
 }
 ```
 
-Using the above, the generic templates built from the `Customer` will be used to produce the equivalent for `Role` and
+Using the above, the generic templates built from the `AdminUser` will be used to produce the equivalent for `Role` and
 `Customer`. The `profile` identifies which directory path under `src/test/scaffolding` will be used as the basis so that
 collections of templates with simple variations can be managed.
 
 Execute `Scaffolding.main()` with `scaffolding.js` set as above. Then take a look under
-`src/main/java/uk/co/froot/example/dto`. You'll notice that in addition to the original `customer.Customer` there
+`src/main/java/uk/co/froot/example/dto`. You'll notice that in addition to the original `admin_user.AdminUser` there
 are now some new packages and classes in both the `src/main` and `src/test` branches. Following the example above
 you'll find `role.Role` and `customer.Customer`.
 
-They even have unit tests. Since `CustomerTest` was available, `Scaffolding` was able to generate the unit tests,
+They even have unit tests. Since `AdminUserTest` was available, `Scaffolding` was able to generate the unit tests,
 their test fixtures and some friendly entity-specific documentation.
 
 Note that the `template_location` supports the `classpath:` prefix so that the Scaffolding class can be used within an
