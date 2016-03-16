@@ -11,13 +11,10 @@ import com.google.common.io.Resources;
 import com.google.common.reflect.ClassPath;
 import org.apache.commons.io.IOUtils;
 
-import javax.json.*;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
+import javax.json.Json;
+import javax.json.JsonObjectBuilder;
+import javax.json.JsonValue;
+import java.io.*;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
@@ -315,18 +312,17 @@ public class Scaffolding {
       userTokenBuilder.add(
               entry.getKey(),
               Json.createObjectBuilder()
-                      .add("isFilePath", JsonValue.FALSE)
+                      .add("isFilePath", entry.getValue().isFilePath())
                       .add("content", "")
                       .add("token", entry.getValue().getToken())
-                      .add("isActive", JsonValue.FALSE)
+                      .add("isActive", entry.getValue().isActive())
 
       );
     }
     JsonObjectBuilder scaffoldingBuilder = Json.createObjectBuilder()
             .add("profile", "default")
-            .add("output_directory", ".")
+            .add("output_directory", "./output")
             .add("template_location", "src/test/resources/scaffolding")
-            .add("base_package", "uk.co.froot.example")
             .add("read", JsonValue.FALSE)
             .add("entities", Json.createArrayBuilder().build())
             .add("user_token_map", userTokenBuilder.build());
@@ -451,6 +447,12 @@ public class Scaffolding {
           .replace(entitySnake, ENTITY_SNAKE_DIRECTIVE)
           .replace(entityHyphen, ENTITY_HYPHEN_DIRECTIVE)
         ;
+
+        if(isIgnoredFile(projectPath)) {
+          // Ignore
+          System.err.println("Ignoring '" + projectPath + "' due to ignore list containing this file.");
+          continue;
+        }
 
         // Check if path or content must contain directives
         if (sc.isOnlyWithEntityDirectives() && !containsEntityDirectives(projectPath, content)) {
@@ -606,7 +608,8 @@ public class Scaffolding {
       for (Map.Entry<String, UserToken> entry : sc.getUserTokenMap().entrySet()) {
         if(entry.getValue().isActive()) {
           if(entry.getValue().isFilePath()) {
-            String fragmentContent = buildContentFromExternalFile(entry.getValue().getContent());
+            String fragmentPath = "scaffolding/fragments/" + entry.getValue().getContent();
+            String fragmentContent = buildContentFromExternalFile(fragmentPath);
             directiveMap.put("{{"+entry.getKey()+"}}", fragmentContent);
           } else {
             directiveMap.put("{{"+entry.getKey()+"}}", entry.getValue().getContent());
@@ -635,6 +638,12 @@ public class Scaffolding {
         String target = templateEntry.getKey();
         // Strip off the .hbs
         target = target.substring(0, target.length() - 4);
+
+        if(isIgnoredFile(target)) {
+          // Ignore
+          System.err.println("Ignoring '" + target + "' due to ignore list containing this file.");
+          continue;
+        }
 
         // Check if path or content must contain directives
         if (sc.isOnlyWithEntityDirectives() && !containsEntityDirectives(target, content)) {
@@ -668,6 +677,22 @@ public class Scaffolding {
 
     }
 
+  }
+
+  private boolean isIgnoredFile(String path) {
+    return path.contains("/Scaffolding.java")
+            || path.contains("README.md")
+            || path.contains("scaffolding.json")
+            || path.contains("template.json")
+            || path.contains("scaffolding/fragments/")
+            || path.contains("target/")
+            || path.contains(".idea/")
+            || path.contains(".iml")
+            || path.contains(".classpath")
+            || path.contains(".project")
+            || path.contains(".settings/")
+            || path.contains(".iws")
+            || path.contains(".DS_Store");
   }
 
   private String buildContentFromExternalFile(String filePath) throws IOException {

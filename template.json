@@ -8,6 +8,7 @@
   "entities": ["AdminUser"],
   "user_token_map": {
     "RETURN_ID": {
+      "isActive": true,
       "token": "getId"
     }
   }
