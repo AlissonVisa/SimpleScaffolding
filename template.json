@@ -1,0 +1,14 @@
+{
+  "profile":"default",
+  "output_directory":"target/generated-resources",
+  "template_location": "src/test/resources/scaffolding",
+  "base_package":"uk.co.froot.example",
+  "read": true,
+  "only_with_entity_directives": true,
+  "entities": ["AdminUser"],
+  "user_token_map": {
+    "RETURN_ID": {
+      "token": "getId"
+    }
+  }
+}

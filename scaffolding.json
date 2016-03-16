@@ -1,11 +1,16 @@
 {
   "profile": "default",
-  "input_directory": ".",
   "output_directory": ".",
   "template_location": "src/test/resources/scaffolding",
   "base_package": "uk.co.froot.example",
   "read": false,
-  "only_with_entity_directives": false,
-  "entities": ["CustomerUser"],
-  "user_token_map": {"PORT":"1000"}
+  "entities": ["Customer", "Role"],
+  "user_token_map": {
+    "RETURN_ID": {
+      "isFilePath": true,
+      "content": "fragments/entity/AdminUserFragment",
+      "token": "//todo#getId",
+      "isActive": true
+    }
+  }
 }

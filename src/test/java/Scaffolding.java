@@ -9,7 +9,9 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import com.google.common.reflect.ClassPath;
+import org.apache.commons.io.IOUtils;
 
+import javax.json.*;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -306,6 +308,31 @@ public class Scaffolding {
     writeTemplates(sc);
   }
 
+  private String buildScaffoldingConfigurationContent() {
+    JsonObjectBuilder userTokenBuilder = Json.createObjectBuilder();
+    // Check for user template entries
+    for (Map.Entry<String, UserToken> entry : sc.getUserTokenMap().entrySet()) {
+      userTokenBuilder.add(
+              entry.getKey(),
+              Json.createObjectBuilder()
+                      .add("isFilePath", JsonValue.FALSE)
+                      .add("content", "")
+                      .add("token", entry.getValue().getToken())
+                      .add("isActive", JsonValue.FALSE)
+
+      );
+    }
+    JsonObjectBuilder scaffoldingBuilder = Json.createObjectBuilder()
+            .add("profile", "default")
+            .add("output_directory", ".")
+            .add("template_location", "src/test/resources/scaffolding")
+            .add("base_package", "uk.co.froot.example")
+            .add("read", JsonValue.FALSE)
+            .add("entities", Json.createArrayBuilder().build())
+            .add("user_token_map", userTokenBuilder.build());
+    return scaffoldingBuilder.build().toString();
+  }
+
   /**
    * Execute in read mode
    *
@@ -347,6 +374,10 @@ public class Scaffolding {
     }
 
     readTemplates(sc);
+
+    String inputDir = sc.getInputDirectory();
+    String scaffoldingConfigurationContent = buildScaffoldingConfigurationContent();
+    writeResult(scaffoldingConfigurationContent, inputDir + "/scaffolding.json");
   }
 
   /**
@@ -407,9 +438,9 @@ public class Scaffolding {
         ;
 
         // Check for user template entries
-        for (Map.Entry<String, String> entry : sc.getUserTokenMap().entrySet()) {
+        for (Map.Entry<String, UserToken> entry : sc.getUserTokenMap().entrySet()) {
           // Find the value and replace with the key as a directive (e.g. "{{PORT}}")
-          content = content.replace(entry.getValue(), "{{"+entry.getKey()+"}}");
+          content = content.replace(entry.getValue().getToken(), "{{"+entry.getKey()+"}}");
         }
 
         templateTarget = templateTarget
@@ -572,8 +603,17 @@ public class Scaffolding {
       Map<String, String> directiveMap = Maps.newHashMap();
 
       // Add user tokens as directives (will be overwritten by standard ones)
-      for (Map.Entry<String, String> entry : sc.getUserTokenMap().entrySet()) {
-        directiveMap.put("{{"+entry.getKey()+"}}", entry.getValue());
+      for (Map.Entry<String, UserToken> entry : sc.getUserTokenMap().entrySet()) {
+        if(entry.getValue().isActive()) {
+          if(entry.getValue().isFilePath()) {
+            String fragmentContent = buildContentFromExternalFile(entry.getValue().getContent());
+            directiveMap.put("{{"+entry.getKey()+"}}", fragmentContent);
+          } else {
+            directiveMap.put("{{"+entry.getKey()+"}}", entry.getValue().getContent());
+          }
+        } else {
+          directiveMap.put("{{"+entry.getKey()+"}}", "");
+        }
       }
 
       // Add standard directives
@@ -628,6 +668,20 @@ public class Scaffolding {
 
     }
 
+  }
+
+  private String buildContentFromExternalFile(String filePath) throws IOException {
+
+    String result = "";
+
+    ClassLoader classLoader = Scaffolding.class.getClassLoader();
+    try {
+      result = IOUtils.toString(classLoader.getResourceAsStream(filePath));
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    return result;
   }
 
   /**
@@ -688,7 +742,7 @@ public class Scaffolding {
     private Set<URI> projectUris = Sets.newHashSet();
 
     @JsonProperty("user_token_map")
-    private Map<String, String> userTokenMap = Maps.newHashMap();
+    private Map<String, UserToken> userTokenMap = Maps.newHashMap();
 
     public ScaffoldingConfiguration() {
     }
@@ -828,15 +882,58 @@ public class Scaffolding {
     }
 
 
-    public void setUserTokenMap(Map<String, String> userTokenMap) {
+    public void setUserTokenMap(Map<String, UserToken> userTokenMap) {
       this.userTokenMap = userTokenMap;
     }
 
     /**
      * @return The user's token map with key-value pairs for additional replacement
      */
-    public Map<String, String> getUserTokenMap() {
+    public Map<String, UserToken> getUserTokenMap() {
       return userTokenMap;
+    }
+  }
+
+  public static class UserToken {
+    @JsonProperty
+    private boolean isActive;
+    @JsonProperty
+    private String token;
+    @JsonProperty
+    private String content;
+    @JsonProperty
+    private boolean isFilePath;
+
+    public boolean isActive() {
+      return this.isActive;
+    }
+
+    public void setActive(boolean active) {
+      this.isActive = active;
+    }
+
+    public String getToken() {
+      return "#"+token;
+    }
+
+    public void setToken(String token) {
+      this.token = token;
+    }
+
+    public String getContent() {
+      return content;
+    }
+
+    public void setContent(String content) {
+      this.content = content;
+    }
+
+    public boolean isFilePath() {
+      return this.isFilePath;
+    }
+
+    public void setFilePath(boolean filePath) {
+      this.isFilePath = filePath;
     }
   }
 

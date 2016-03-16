@@ -20,9 +20,7 @@ public class AdminUser {
   @JsonProperty
   private Long id;
 
-  public Long getId() {
-    return id;
-  }
+  #getId
 
   public void setId(Long id) {
     this.id = id;
