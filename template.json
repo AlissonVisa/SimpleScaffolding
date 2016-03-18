@@ -5,10 +5,14 @@
   "base_package":"uk.co.froot.example",
   "read": true,
   "only_with_entity_directives": true,
-  "entities": ["AdminUser"],
+  "entities_context": [{
+    "entity_token": "AdminUser"
+  },{
+    "entity_token": "OnlyGetters"
+  }],
   "user_token_map": {
     "RETURN_ID": {
-      "isActive": true,
+      "is_active": true,
       "token": "getId"
     }
   }

@@ -12,6 +12,7 @@ import com.google.common.reflect.ClassPath;
 import org.apache.commons.io.IOUtils;
 
 import javax.json.Json;
+import javax.json.JsonArrayBuilder;
 import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
 import java.io.*;
@@ -60,7 +61,7 @@ import java.util.regex.Pattern;
  *   "base_package": "org.example.service",
  *   "read": true,
  *   "only_with_entity_directives": false,
- *   "entities": ["MyEntity"],
+ *   "entitiesContext": ["MyEntity"],
  *   "user_token_map": {"PORT": "1000"}
  * }
  *
@@ -71,7 +72,7 @@ import java.util.regex.Pattern;
  * be little to no editing required.</p>
  * <h3>Generate code from templates</h3>
  * <p>Once you have your templates in place, you can use them to generate new code. This is again driven by the <code>scaffolding.json</code>
- * files. You switch away from <code>read</code> and provide a list of new entities that you would like created:</p>
+ * files. You switch away from <code>read</code> and provide a list of new entitiesContext that you would like created:</p>
  * <pre>
  * {
  *   "profile": "example-microservice",
@@ -81,13 +82,13 @@ import java.util.regex.Pattern;
  *   "base_package": "org.example.service",
  *   "read": false,
  *   "only_with_entity_directives": false,
- *   "entities": ["Role", "DataSource"],
+ *   "entitiesContext": ["Role", "DataSource"],
  *   "user_token_map": {"PORT": "1000"}
  * }
  * </pre>
  * <p>Using the above, the generic templates built from the <code>MyEntity</code> will be used to produce the
  * equivalent for<code>Role</code> and <code>DataSource</code>. If you have been careful with what is included in
- * <code>User</code> then the produced code will act as good launch point for the new entities.</p>
+ * <code>User</code> then the produced code will act as good launch point for the new entitiesContext.</p>
  *
  * <p>Note that <code>template_location</code> has been adjusted to show support for reading templates off a classpath
  * location. Also the <code>PORT</code> entry replaces the first 4 digits in the actual port which allows a group of ports
@@ -100,11 +101,23 @@ public class Scaffolding {
 
   // File filters
   private static final String[] IGNORE_FILE_REGEXES = new String[]{
-    "scaffolding.json$",
+    "\\./scaffolding.json$",
+    "\\./template.json$",
+    "\\./README.md$",
+    ".*/Scaffolding.java$",
+    ".*/target/.*$",
+    ".*/target$",
+    ".*/resources/scaffolding/.*$",
+    ".*/resources/scaffolding$",
     ".*\\.classpath$",
+    ".*\\.project/.*$",
     ".*\\.project$",
     ".*\\.wtpmodules$",
     ".*\\.iml$",
+    ".*\\.idea/.*$",
+    ".*\\.idea$",
+    ".*\\.git/.*$",
+    ".*\\.git$",
     ".*\\.iws$",
     ".*nb.*\\.xml$",
     ".*\\.DS_Store$",
@@ -115,13 +128,13 @@ public class Scaffolding {
   // Directives
   private static final String BASE_PACKAGE_DIRECTIVE = "{{package}}";
   private static final String BASE_PACKAGE_PATH_DIRECTIVE = "{{package-path}}";
-  private static final String ENTITY_CLASS_DIRECTIVE = "{{entity-class}}";
-  private static final String ENTITY_TITLE_DIRECTIVE = "{{entity-title}}";
-  private static final String ENTITY_VARIABLE_DIRECTIVE = "{{entity-variable}}";
-  private static final String ENTITY_HYPHEN_DIRECTIVE = "{{entity-hyphen}}";
-  private static final String ENTITY_COMMENT_DIRECTIVE = "{{entity-comment}}";
-  private static final String ENTITY_SNAKE_DIRECTIVE = "{{entity-snake}}";
-  private static final String ENTITY_SNAKE_UPPER_DIRECTIVE = "{{entity-snake-upper}}";
+  private static final String ENTITY_CLASS_DIRECTIVE = "{{entity-class-%s}}";
+  private static final String ENTITY_TITLE_DIRECTIVE = "{{entity-title-%s}}";
+  private static final String ENTITY_VARIABLE_DIRECTIVE = "{{entity-variable-%s}}";
+  private static final String ENTITY_HYPHEN_DIRECTIVE = "{{entity-hyphen-%s}}";
+  private static final String ENTITY_COMMENT_DIRECTIVE = "{{entity-comment-%s}}";
+  private static final String ENTITY_SNAKE_DIRECTIVE = "{{entity-snake-%s}}";
+  private static final String ENTITY_SNAKE_UPPER_DIRECTIVE = "{{entity-snake-upper-%s}}";
   private static final String DIRECTIVE_REGEX = "\\{\\{entity.\\S+\\}\\}";
   private static final Pattern ENTITY_DIRECTIVE_PATTERN = Pattern.compile(DIRECTIVE_REGEX);
 
@@ -217,7 +230,7 @@ public class Scaffolding {
    *
    * @param camelCase The camel case (with arbitrary initial capitalisation)
    *
-   * @return A document version in lowercase (useful for describing entities in Javadocs)
+   * @return A document version in lowercase (useful for describing entitiesContext in Javadocs)
    */
   public static String toComment(String camelCase) {
     return camelCase.replaceAll(
@@ -242,7 +255,7 @@ public class Scaffolding {
    *
    * @param camelCase The camel case (with arbitrary initial capitalisation)
    *
-   * @return A hyphen version in lowercase (useful for describing entities in RESTful endpoints)
+   * @return A hyphen version in lowercase (useful for describing entitiesContext in RESTful endpoints)
    */
   public static String toHyphen(String camelCase) {
     return camelCase.replaceAll(
@@ -267,7 +280,7 @@ public class Scaffolding {
    *
    * @param camelCase The camel case (with arbitrary initial capitalisation)
    *
-   * @return A document version in title case (useful for describing entities in titles)
+   * @return A document version in title case (useful for describing entitiesContext in titles)
    */
   public static String toTitle(String camelCase) {
     String spaced = camelCase.replaceAll(
@@ -312,19 +325,27 @@ public class Scaffolding {
       userTokenBuilder.add(
               entry.getKey(),
               Json.createObjectBuilder()
-                      .add("isFilePath", entry.getValue().isFilePath())
+                      .add("is_file_path", entry.getValue().isFilePath())
                       .add("content", "")
                       .add("token", entry.getValue().getToken())
-                      .add("isActive", entry.getValue().isActive())
+                      .add("is_active", entry.getValue().isActive())
 
       );
+    }
+    JsonArrayBuilder entitiesContextArray = Json.createArrayBuilder();
+    for(EntityContext entityContext: sc.getEntitiesContext()) {
+      entitiesContextArray
+              .add(Json.createObjectBuilder()
+                      .add("entity_token", entityContext.getEntityToken())
+                      .add("entities", Json.createArrayBuilder().add("").build())
+                      .build());
     }
     JsonObjectBuilder scaffoldingBuilder = Json.createObjectBuilder()
             .add("profile", "default")
             .add("output_directory", "./output")
             .add("template_location", "src/test/resources/scaffolding")
             .add("read", JsonValue.FALSE)
-            .add("entities", Json.createArrayBuilder().build())
+            .add("entities_context", entitiesContextArray.build())
             .add("user_token_map", userTokenBuilder.build());
     return scaffoldingBuilder.build().toString();
   }
@@ -346,26 +367,10 @@ public class Scaffolding {
     File[] files = new File(sc.getInputDirectory()).listFiles();
     if (files != null) {
       for (File file : files) {
-        if (file.isDirectory()) {
-          continue;
-        }
-
-        String fileName = file.getName();
-
-        // Handle common exclusions
-        boolean ignore = false;
-        for (Pattern pattern : ignoreFilePatterns) {
-          if (pattern.matcher(fileName).matches()) {
-            // It's on the ignore list
-            ignore = true;
-          }
-        }
-
-        if (!ignore) {
-          projectUris.add(file.toURI());
-        } else {
-          System.err.println("Ignoring '" + fileName + "'");
-        }
+//        if (file.isDirectory()) {
+//          continue;
+//        }
+        handleUrisFilteringIgnoredFiles(file, projectUris);
       }
     }
 
@@ -374,6 +379,31 @@ public class Scaffolding {
     String inputDir = sc.getInputDirectory();
     String scaffoldingConfigurationContent = buildScaffoldingConfigurationContent();
     writeResult(scaffoldingConfigurationContent, inputDir + "/scaffolding.json");
+  }
+
+  private void handleUrisFilteringIgnoredFiles(File file, Set<URI> projectUris) {
+    String fileName = file.getName();
+    String path = file.getPath();
+
+    if (fileName.matches("^(.*?)")) {
+
+      // Handle common exclusions
+      boolean ignore = false;
+      for (Pattern pattern : ignoreFilePatterns) {
+        if (pattern.matcher(path).matches()) {
+          // It's on the ignore list
+          ignore = true;
+          break;
+        }
+      }
+
+      if (!ignore) {
+        projectUris.add(file.toURI());
+      } else {
+        System.err.println("Ignoring '" + fileName + "'");
+      }
+
+    }
   }
 
   /**
@@ -385,7 +415,7 @@ public class Scaffolding {
    */
   private void readTemplates(ScaffoldingConfiguration sc) throws IOException {
 
-    Set<String> entities = sc.getEntities();
+    Set<EntityContext> entitiesContext = sc.getEntitiesContext();
     String basePackage = sc.getBasePackage();
 
     // Form a set of all classes in the classpath starting at the base package
@@ -399,9 +429,11 @@ public class Scaffolding {
       // Read the source file
       String sourceCode = Resources.toString(uri.toURL(), Charset.defaultCharset());
 
-      // Multiple entities may lead to overlapping templates
+      // Multiple entitiesContext may lead to overlapping templates
       // but some project structures can cater for this
-      for (String entity : entities) {
+      for (EntityContext entityContext : entitiesContext) {
+        // Cache token
+        String token = entityContext.getEntityToken();
 
         // Work out the template target
         String templateTarget = sc.getTemplateLocation() + "/" + sc.getProfilePath() + projectPath + ".hbs";
@@ -409,28 +441,28 @@ public class Scaffolding {
         // Introduce the base package directive
         String content = sourceCode.replace(basePackage, BASE_PACKAGE_DIRECTIVE);
 
-        // Build the patterns to recognise the entities
-        String entityVariable = entity.substring(0, 1).toLowerCase() + entity.substring(1); // Java case
-        String entityTitle = toTitle(entity);
-        String entitySnake = toSnakeCase(entity);
-        String entityComment = toComment(entity);
-        String entityHyphen = toHyphen(entity);
+        // Build the patterns to recognise the entitiesContext
+        String entityVariable = token.substring(0, 1).toLowerCase() + token.substring(1); // Java case
+        String entityTitle = toTitle(token);
+        String entitySnake = toSnakeCase(token);
+        String entityComment = toComment(token);
+        String entityHyphen = toHyphen(token);
 
         // Check for entity content
         content = content
-          .replace(entity, ENTITY_CLASS_DIRECTIVE)
+          .replace(token, wrapEntityDirective(token, ENTITY_CLASS_DIRECTIVE))
             // Detect title case (e.g. in README)
-          .replace(entityTitle, ENTITY_TITLE_DIRECTIVE)
+          .replace(entityTitle, wrapEntityDirective(entityTitle, ENTITY_TITLE_DIRECTIVE))
             // Detect variable case (e.g. in methods)
-          .replace(entityVariable, ENTITY_VARIABLE_DIRECTIVE)
+          .replace(entityVariable, wrapEntityDirective(entityVariable,ENTITY_VARIABLE_DIRECTIVE))
             // Detect comment (e.g. in Javadocs)
-          .replace(entityComment, ENTITY_COMMENT_DIRECTIVE)
+          .replace(entityComment, wrapEntityDirective(entityComment,ENTITY_COMMENT_DIRECTIVE))
             // Detect ADMIN_USER
-          .replace(entitySnake.toUpperCase(), ENTITY_SNAKE_UPPER_DIRECTIVE)
+          .replace(entitySnake.toUpperCase(), wrapEntityDirective(entitySnake.toUpperCase(),ENTITY_SNAKE_UPPER_DIRECTIVE))
             // Detect admin_user and "admin_user"
-          .replace(entitySnake, ENTITY_SNAKE_DIRECTIVE)
+          .replace(entitySnake, wrapEntityDirective(entitySnake,ENTITY_SNAKE_DIRECTIVE))
             // Detect admin-user
-          .replace(entityHyphen, ENTITY_HYPHEN_DIRECTIVE)
+          .replace(entityHyphen, wrapEntityDirective(entityHyphen,ENTITY_HYPHEN_DIRECTIVE))
         ;
 
         // Check for user template entries
@@ -440,22 +472,22 @@ public class Scaffolding {
         }
 
         templateTarget = templateTarget
-          .replace(entity, ENTITY_CLASS_DIRECTIVE)
-          .replace(entityTitle, ENTITY_TITLE_DIRECTIVE)
-          .replace(entityVariable, ENTITY_VARIABLE_DIRECTIVE)
-          .replace(entitySnake.toUpperCase(), ENTITY_SNAKE_UPPER_DIRECTIVE)
-          .replace(entitySnake, ENTITY_SNAKE_DIRECTIVE)
-          .replace(entityHyphen, ENTITY_HYPHEN_DIRECTIVE)
+          .replace(token, wrapEntityDirective(token, ENTITY_CLASS_DIRECTIVE))
+          .replace(entityTitle, wrapEntityDirective(entityTitle, ENTITY_TITLE_DIRECTIVE))
+          .replace(entityVariable, wrapEntityDirective(entityVariable, ENTITY_VARIABLE_DIRECTIVE))
+          .replace(entitySnake.toUpperCase(), wrapEntityDirective(entitySnake.toUpperCase(), ENTITY_SNAKE_UPPER_DIRECTIVE))
+          .replace(entitySnake, wrapEntityDirective(entitySnake, ENTITY_SNAKE_DIRECTIVE))
+          .replace(entityHyphen, wrapEntityDirective(entityHyphen, ENTITY_HYPHEN_DIRECTIVE))
         ;
 
-        if(isIgnoredFile(projectPath)) {
-          // Ignore
-          System.err.println("Ignoring '" + projectPath + "' due to ignore list containing this file.");
-          continue;
-        }
+//        if(isIgnoredFile(projectPath)) {
+//          // Ignore
+//          System.err.println("Ignoring '" + projectPath + "' due to ignore list containing this file.");
+//          continue;
+//        }
 
         // Check if path or content must contain directives
-        if (sc.isOnlyWithEntityDirectives() && !containsEntityDirectives(projectPath, content)) {
+        if (sc.isOnlyWithEntityDirectives() && !containsEntityTokenDirectives(projectPath, content, token)) {
           // Ignore
           System.err.println("Ignoring '" + projectPath + "' due to directive restriction.");
           continue;
@@ -467,14 +499,35 @@ public class Scaffolding {
     }
   }
 
+  private String wrapEntityDirective(String token, String wrapperFormat) {
+    return String.format(wrapperFormat, token);
+  }
+
   /**
    * @param path    The path
    * @param content The content
    *
-   * @return True if either the path or content contain entity directives
+   * @return True if either the path or content contain entity token directives
    */
+  private boolean containsEntityTokenDirectives(String path, String content, String entityToken) {
+    return path.contains(wrapEntityDirective(entityToken,ENTITY_VARIABLE_DIRECTIVE))
+            || content.contains(wrapEntityDirective(entityToken,ENTITY_VARIABLE_DIRECTIVE))
+            || path.contains(wrapEntityDirective(entityToken,ENTITY_CLASS_DIRECTIVE))
+            || content.contains(wrapEntityDirective(entityToken,ENTITY_CLASS_DIRECTIVE))
+            || path.contains(wrapEntityDirective(entityToken,ENTITY_HYPHEN_DIRECTIVE))
+            || content.contains(wrapEntityDirective(entityToken,ENTITY_HYPHEN_DIRECTIVE))
+            || path.contains(wrapEntityDirective(entityToken,ENTITY_SNAKE_DIRECTIVE))
+            || content.contains(wrapEntityDirective(entityToken,ENTITY_SNAKE_DIRECTIVE))
+            || path.contains(wrapEntityDirective(entityToken,ENTITY_SNAKE_UPPER_DIRECTIVE))
+            || content.contains(wrapEntityDirective(entityToken,ENTITY_SNAKE_UPPER_DIRECTIVE))
+            || path.contains(wrapEntityDirective(entityToken,ENTITY_TITLE_DIRECTIVE))
+            || content.contains(wrapEntityDirective(entityToken,ENTITY_TITLE_DIRECTIVE))
+            || path.contains(wrapEntityDirective(entityToken,ENTITY_COMMENT_DIRECTIVE))
+            || content.contains(wrapEntityDirective(entityToken,ENTITY_COMMENT_DIRECTIVE));
+  }
+
   private boolean containsEntityDirectives(String path, String content) {
-    return ENTITY_DIRECTIVE_PATTERN.matcher(path).find() || ENTITY_DIRECTIVE_PATTERN.matcher(content).find();
+    return ENTITY_DIRECTIVE_PATTERN.matcher(path).find() && ENTITY_DIRECTIVE_PATTERN.matcher(content).find();
   }
 
   /**
@@ -494,7 +547,11 @@ public class Scaffolding {
           recurseFiles(file.getAbsolutePath(), projectUris);
           continue;
         }
-        if (file.getName().matches("^(.*?)")) {
+        if(sc.isRead()) {
+
+          handleUrisFilteringIgnoredFiles(file, projectUris);
+        } else {
+
           projectUris.add(file.toURI());
         }
       }
@@ -585,115 +642,130 @@ public class Scaffolding {
    */
   private void writeTemplates(ScaffoldingConfiguration sc) throws IOException {
 
-    Set<String> entities = sc.getEntities();
+    Set<EntityContext> entitiesContext = sc.getEntitiesContext();
     String basePackage = sc.getBasePackage();
     String outputDirectory = sc.getOutputDirectory();
 
     // Read all the templates
     Map<String, String> templateMap = buildTemplateMap(sc);
 
-    // Work through the entities applying the templates
-    for (String entity : entities) {
+    // Work through the entitiesContext applying the templates
+    for (EntityContext entityContext : entitiesContext) {
+      // Cache token
+      String token = entityContext.getEntityToken();
+      for(String entity: entityContext.getEntities()) {
 
-      String entityVariable = entity.substring(0, 1).toLowerCase() + entity.substring(1);
-      String entityTitle = toTitle(entity);
-      String entitySnake = toSnakeCase(entity);
-      String entityHyphen = toHyphen(entity);
-      String entityComment = toComment(entity);
+        String entityVariable = entity.substring(0, 1).toLowerCase() + entity.substring(1);
+        String entityTitle = toTitle(entity);
+        String entitySnake = toSnakeCase(entity);
+        String entityHyphen = toHyphen(entity);
+        String entityComment = toComment(entity);
 
-      // Create directive map for replacements
-      Map<String, String> directiveMap = Maps.newHashMap();
+        String tokenVariable = token.substring(0, 1).toLowerCase() + token.substring(1);
+        String tokenTitle = toTitle(token);
+        String tokenSnake = toSnakeCase(token);
+        String tokenHyphen = toHyphen(token);
+        String tokenComment = toComment(token);
 
-      // Add user tokens as directives (will be overwritten by standard ones)
-      for (Map.Entry<String, UserToken> entry : sc.getUserTokenMap().entrySet()) {
-        if(entry.getValue().isActive()) {
-          if(entry.getValue().isFilePath()) {
-            String fragmentPath = "scaffolding/fragments/" + entry.getValue().getContent();
-            String fragmentContent = buildContentFromExternalFile(fragmentPath);
-            directiveMap.put("{{"+entry.getKey()+"}}", fragmentContent);
+        // Create directive map for replacements
+        Map<String, String> directiveMap = Maps.newHashMap();
+
+        // Add user tokens as directives (will be overwritten by standard ones)
+        for (Map.Entry<String, UserToken> entry : sc.getUserTokenMap().entrySet()) {
+          if (entry.getValue().isActive()) {
+            if (entry.getValue().isFilePath()) {
+              String fragmentPath = "scaffolding/fragments/" + entry.getValue().getContent();
+              String fragmentContent = buildContentFromExternalFile(fragmentPath);
+              directiveMap.put("{{" + entry.getKey() + "}}", fragmentContent);
+            } else {
+              directiveMap.put("{{" + entry.getKey() + "}}", entry.getValue().getContent());
+            }
           } else {
-            directiveMap.put("{{"+entry.getKey()+"}}", entry.getValue().getContent());
+            directiveMap.put("{{" + entry.getKey() + "}}", "");
           }
-        } else {
-          directiveMap.put("{{"+entry.getKey()+"}}", "");
-        }
-      }
-
-      // Add standard directives
-      directiveMap.put(BASE_PACKAGE_DIRECTIVE, basePackage);
-      directiveMap.put(BASE_PACKAGE_PATH_DIRECTIVE, sc.getBasePath());
-      directiveMap.put(ENTITY_CLASS_DIRECTIVE, entity);
-      directiveMap.put(ENTITY_TITLE_DIRECTIVE, entityTitle);
-      directiveMap.put(ENTITY_VARIABLE_DIRECTIVE, entityVariable);
-      directiveMap.put(ENTITY_HYPHEN_DIRECTIVE, entityHyphen);
-      directiveMap.put(ENTITY_COMMENT_DIRECTIVE, entityComment);
-      directiveMap.put(ENTITY_SNAKE_UPPER_DIRECTIVE, entitySnake.toUpperCase());
-      directiveMap.put(ENTITY_SNAKE_DIRECTIVE, entitySnake);
-
-      for (Map.Entry<String, String> templateEntry : templateMap.entrySet()) {
-
-        String content = templateEntry.getValue();
-
-        // Transform the target
-        String target = templateEntry.getKey();
-        // Strip off the .hbs
-        target = target.substring(0, target.length() - 4);
-
-        if(isIgnoredFile(target)) {
-          // Ignore
-          System.err.println("Ignoring '" + target + "' due to ignore list containing this file.");
-          continue;
         }
 
-        // Check if path or content must contain directives
-        if (sc.isOnlyWithEntityDirectives() && !containsEntityDirectives(target, content)) {
-          // Ignore
-          System.err.println("Ignoring '" + target + "' due to directive restriction.");
-          continue;
-        }
+        // Add standard directives
+        directiveMap.put(BASE_PACKAGE_DIRECTIVE, basePackage);
+        directiveMap.put(BASE_PACKAGE_PATH_DIRECTIVE, sc.getBasePath());
+        directiveMap.put(wrapEntityDirective(token, ENTITY_CLASS_DIRECTIVE), entity);
+        directiveMap.put(wrapEntityDirective(tokenTitle, ENTITY_TITLE_DIRECTIVE), entityTitle);
+        directiveMap.put(wrapEntityDirective(tokenVariable, ENTITY_VARIABLE_DIRECTIVE), entityVariable);
+        directiveMap.put(wrapEntityDirective(tokenHyphen, ENTITY_HYPHEN_DIRECTIVE), entityHyphen);
+        directiveMap.put(wrapEntityDirective(tokenComment, ENTITY_COMMENT_DIRECTIVE), entityComment);
+        directiveMap.put(wrapEntityDirective(tokenSnake.toUpperCase(), ENTITY_SNAKE_UPPER_DIRECTIVE), entitySnake.toUpperCase());
+        directiveMap.put(wrapEntityDirective(tokenSnake, ENTITY_SNAKE_DIRECTIVE), entitySnake);
 
-        // Cache the profile path
-        String profilePath = sc.getProfilePath();
+        for (Map.Entry<String, String> templateEntry : templateMap.entrySet()) {
 
-        System.out.println("profilePath:" + profilePath);
+          String content = templateEntry.getValue();
 
-        // Transform target and content using directives
-        for (Map.Entry<String, String> directiveEntry : directiveMap.entrySet()) {
+          // Transform the target
+          String target = templateEntry.getKey();
+          // Strip off the .hbs
+          target = target.substring(0, target.length() - 4);
 
-          target = target.replace(directiveEntry.getKey(), directiveEntry.getValue());
+//        if(isIgnoredFile(target)) {
+//          // Ignore
+//          System.err.println("Ignoring '" + target + "' due to ignore list containing this file.");
+//          continue;
+//        }
 
-          if (target.contains(profilePath)) {
-            // Strip off unwanted paths (possibly running in an IDE)
-            target = target.substring(target.indexOf(profilePath) + profilePath.length());
+          // Check if path or content must contain directives
+          if (sc.isOnlyWithEntityDirectives() && !containsEntityTokenDirectives(target, content, token)) {
+            // Ignore
+            System.err.println("Ignoring '" + target + "' due to directive restriction.");
+            continue;
+          } else if (!containsEntityTokenDirectives(target, content, token) && containsEntityDirectives(target, content)) {
+            // Ignore
+            System.err.println("Ignoring '" + target + "' due to directive that has already been processed.");
+            continue;
           }
 
-          content = content.replace(directiveEntry.getKey(), directiveEntry.getValue());
+          // Cache the profile path
+          String profilePath = sc.getProfilePath();
 
+          System.out.println("profilePath:" + profilePath);
+
+          // Transform target and content using directives
+          for (Map.Entry<String, String> directiveEntry : directiveMap.entrySet()) {
+
+            target = target.replace(directiveEntry.getKey(), directiveEntry.getValue());
+
+            if (target.contains(profilePath)) {
+              // Strip off unwanted paths (possibly running in an IDE)
+              target = target.substring(target.indexOf(profilePath) + profilePath.length());
+            }
+
+            content = content.replace(directiveEntry.getKey(), directiveEntry.getValue());
+
+          }
+
+          // Write out the result
+          writeResult(content, outputDirectory + "/" + target);
         }
 
-        // Write out the result
-        writeResult(content, outputDirectory + "/" + target);
       }
 
     }
 
   }
 
-  private boolean isIgnoredFile(String path) {
-    return path.contains("/Scaffolding.java")
-            || path.contains("README.md")
-            || path.contains("scaffolding.json")
-            || path.contains("template.json")
-            || path.contains("scaffolding/fragments/")
-            || path.contains("target/")
-            || path.contains(".idea/")
-            || path.contains(".iml")
-            || path.contains(".classpath")
-            || path.contains(".project")
-            || path.contains(".settings/")
-            || path.contains(".iws")
-            || path.contains(".DS_Store");
-  }
+//  private boolean isIgnoredFile(String path) {
+//    return path.contains("/Scaffolding.java")
+//            || path.contains("README.md")
+//            || path.contains("scaffolding.json")
+//            || path.contains("template.json")
+//            || path.contains("scaffolding/fragments/")
+//            || path.contains("target/")
+//            || path.contains(".idea/")
+//            || path.contains(".iml")
+//            || path.contains(".classpath")
+//            || path.contains(".project")
+//            || path.contains(".settings/")
+//            || path.contains(".iws")
+//            || path.contains(".DS_Store");
+//  }
 
   private String buildContentFromExternalFile(String filePath) throws IOException {
 
@@ -760,8 +832,8 @@ public class Scaffolding {
     @JsonProperty("only_with_entity_directives")
     private boolean onlyWithEntityDirectives = false;
 
-    @JsonProperty
-    private Set<String> entities = Sets.newHashSet();
+    @JsonProperty("entities_context")
+    private Set<EntityContext> entitiesContext = Sets.newHashSet();
 
     @JsonIgnore
     private Set<URI> projectUris = Sets.newHashSet();
@@ -879,12 +951,12 @@ public class Scaffolding {
       this.onlyWithEntityDirectives = onlyWithEntityDirectives;
     }
 
-    public Set<String> getEntities() {
-      return entities;
+    public Set<EntityContext> getEntitiesContext() {
+      return entitiesContext;
     }
 
-    public void setEntities(Set<String> entities) {
-      this.entities = entities;
+    public void setEntitiesContext(Set<EntityContext> entitiesContext) {
+      this.entitiesContext = entitiesContext;
     }
 
     /**
@@ -919,14 +991,37 @@ public class Scaffolding {
     }
   }
 
+  public static class EntityContext {
+    @JsonProperty("entity_token")
+    private String entityToken;
+    @JsonProperty("entities")
+    private Set<String> entities;
+
+    public Set<String> getEntities() {
+      return entities;
+    }
+
+    public void setEntities(Set<String> entities) {
+      this.entities = entities;
+    }
+
+    public String getEntityToken() {
+      return entityToken;
+    }
+
+    public void setEntityToken(String entityToken) {
+      this.entityToken = entityToken;
+    }
+  }
+
   public static class UserToken {
-    @JsonProperty
+    @JsonProperty("is_active")
     private boolean isActive;
-    @JsonProperty
+    @JsonProperty("token")
     private String token;
-    @JsonProperty
+    @JsonProperty("content")
     private String content;
-    @JsonProperty
+    @JsonProperty("is_file_path")
     private boolean isFilePath;
 
     public boolean isActive() {
